@@ -28,10 +28,10 @@ public class Args {
     @Parameter(names = "-t", description = "The type of the request (set, get, or delete)")
     public String requestType;
 
-    @Parameter(names = "-i", description = "The index of the cell")
+    @Parameter(names = "-k", description = "The index of the cell")
     public String cellIndex;
 
-    @Parameter(names = "-m", description = "The value to save in the database: you only need it in case of a 'set' request")
+    @Parameter(names = "-v", description = "The value to save in the database: you only need it in case of a 'set' request")
     public String valueToSave;
 
 }

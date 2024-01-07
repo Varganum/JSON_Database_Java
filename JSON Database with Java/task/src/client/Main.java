@@ -31,7 +31,11 @@ public class Main {
                     .parse(args);
 
 
-            String msg = buildMessageForServer(arguments.requestType, arguments.cellIndex, arguments.valueToSave);
+            //String msg = buildMessageForServer(arguments.requestType, arguments.cellIndex, arguments.valueToSave);
+            Request requestToServer = new Request(arguments.requestType, arguments.cellIndex, arguments.valueToSave);
+            //requestToServer.printRequestJson();
+
+            String msg = requestToServer.getRequestJson();
 
             output.writeUTF(msg); // send a message to the server
             System.out.println("Sent: " + msg);
