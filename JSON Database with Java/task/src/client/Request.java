@@ -28,12 +28,14 @@ public class Request {
         this.type = type;
         this.cellKey = cellKey;
         this.cellValue = null;
+        buildRequest();
     }
 
     public Request(String type) {
         this.type = type;
         this.cellKey = null;
         this.cellValue = null;
+        buildRequest();
     }
 
     private void buildRequest() {
@@ -54,6 +56,10 @@ public class Request {
 
     public String getRequestJson() {
         return requestJson;
+    }
+
+    public boolean isExit() {
+        return "exit".equals(this.type);
     }
 
 }

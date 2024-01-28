@@ -2,244 +2,94 @@ package server;
 
 import com.google.gson.Gson;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.net.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
 
-    /* Before 4th stage method implementation
-        private static final String[] DB_ARRAY = new String[1000];
-    */
+    private static final String PATH_TO_DB_FILE = "C:\\Java\\JSON Database (Java)\\JSON Database (Java)\\task\\out\\production\\classes\\server\\data\\db.json";
 
-    private static final Map<String, String> DB_MAP = new HashMap<>();
+    private static final File DB_FILE = new File(PATH_TO_DB_FILE);
 
-    private static final Map<String, String> answerToClient = new LinkedHashMap<>();
+    private static final String INITIAL_DB_CONTENT;
 
-    private static String serverAnswer = "";
+    static {
+        try {
+            INITIAL_DB_CONTENT = new String(Files.readAllBytes(Paths.get(PATH_TO_DB_FILE)));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    private static final Map<String, String> DB_MAP = new Gson().fromJson(INITIAL_DB_CONTENT, HashMap.class);
 
-    public static void main(String[] args) {
+    static ExecutorService executorService;
+
+    private static boolean isExit = false;
+
+    public static void main(String[] args) throws IOException {
 
         String address = "127.0.0.1";
         int port = 23456;
 
+        //create ServerSocket
+        ServerSocket server = new ServerSocket(port, 50, InetAddress.getByName(address));
 
-        try (ServerSocket server = new ServerSocket(port, 50, InetAddress.getByName(address))) {
+        //set the time-out time 10 ms so that server could check isExit parameter every 10 ms
+        server.setSoTimeout(10);
 
-            System.out.println("Server started!");
+        System.out.println("Server started!");
+        executorService = Executors.newFixedThreadPool(4);
 
-            /* Before 4th stage method implementation
-            String[] userCommand;
-            */
+        while (!isExit) {
 
-            boolean isExit = false;
-            String commandType;
-            HashMap<String, String> clientRequest;
+            //client socket
+            Socket socket;
 
-
-            while (!isExit) {
-                try (
-                        Socket socket = server.accept(); // accept a new client
-                        DataInputStream input = new DataInputStream(socket.getInputStream());
-                        DataOutputStream output = new DataOutputStream(socket.getOutputStream())
-                ) {
-                    String msg = input.readUTF(); // read a message from the client
-                    System.out.println("Received: " + msg);
-
-                    /* Before 4th stage method implementation
-                    userCommand = acceptUserCommand(msg);
-                    */
-
-                    clientRequest = new Gson().fromJson(msg, HashMap.class);
-                    commandType = clientRequest.get("type");
-
-                    switch (commandType) {
-                        case "exit"   : {isExit = true; updateAnswerToClient("OK"); break;}
-                        case "delete" : {deleteOperation(clientRequest); break;}
-                        case "get"    : {getOperation(clientRequest); break;}
-                        case "set"    : {setOperation(clientRequest); break;}
-                        default       : System.out.println("No such command");
-                    }
-
-                    /* The part from the 2nd stage
-                    String[] msgWords = msg.split(" ");
-                    String recordNumber = msgWords[msgWords.length - 1];
-                    String answer = "A record # " + recordNumber + " was sent!";
-                    output.writeUTF(answer); // resend it to the client
-                    System.out.println("Sent: " + answer);
-                    */
-
-                    /* The part up to 4th stage
-
-                    output.writeUTF(serverAnswer); // send the answer to the client
-                    System.out.println("Sent: " + serverAnswer);
-                    setServerAnswer("");
-                    */
-
-                    serverAnswer = new Gson().toJson(answerToClient);
-                    output.writeUTF(serverAnswer); // send the answer to the client
-                    System.out.println("Sent: " + serverAnswer);
-                    setServerAnswer("");
-
-                }
+            //accept connection from client within the time-out time
+            try {
+                socket = server.accept(); // accept a new client
+            } catch (SocketTimeoutException e) {
+                continue;
             }
+
+            //create input/output streams for connection accepted
+            DataInputStream input = new DataInputStream(socket.getInputStream());
+            DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+
+            //create add execute requestHandler for client
+            RequestHandler requestHandler = new RequestHandler(input, output, DB_MAP);
+            executorService.execute(requestHandler);
+
+        }
+
+        //System.out.println("\nData base content:");
+        //System.out.println(DB_MAP);
+        executorService.shutdown();
+        server.close();
+
+    }
+
+    //change isExit parameter for exit from main server listening loop
+    public static void stopServer() {
+        isExit = true;
+        saveDatabaseToFile();
+    }
+
+    private static void saveDatabaseToFile() {
+        String final_db_content = new Gson().toJson(DB_MAP, HashMap.class);
+        try (FileWriter writer = new FileWriter(DB_FILE)) {
+            writer.write(final_db_content);
         } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        /* Stage 1 part
-
-        do {
-        } while (!isExit);
-        */
-
-        //System.out.println(Arrays.toString(DB_ARRAY));
-
-
-    }
-
-    private static void setOperation(HashMap<String, String> request) {
-
-        DB_MAP.put(request.get("key"), request.get("value"));
-        updateAnswerToClient("OK");
-
-    }
-
-    private static void updateAnswerToClient(String response) {
-        answerToClient.clear();
-        answerToClient.put("response", response);
-    }
-
-    private static void updateAnswerToClientWithReason(String response, String reason) {
-        updateAnswerToClient(response);
-        answerToClient.put("reason", reason);
-    }
-
-    private static void updateAnswerToClientWithValue(String response, String value) {
-        updateAnswerToClient(response);
-        answerToClient.put("value", value);
-    }
-
-    private static void setServerAnswer(String answer) {
-        serverAnswer = answer;
-    }
-
-
-    private static void getOperation(HashMap<String, String> request) {
-
-        if (DB_MAP.containsKey(request.get("key"))) {
-            if ("".equals(DB_MAP.get(request.get("key")))) {
-                updateAnswerToClientWithReason("ERROR", "No such key");
-                //System.out.println("ERROR");
-            } else {
-                //System.out.println(DB_ARRAY[index - 1]);
-                updateAnswerToClientWithValue("OK", DB_MAP.get(request.get("key")));
-            }
-        } else {
-            updateAnswerToClientWithReason("ERROR", "No such key");
-        }
-    }
-
-    private static void deleteOperation(HashMap<String, String> request) {
-
-        if (DB_MAP.containsKey(request.get("key"))) {
-            DB_MAP.remove(request.get("key"));
-            updateAnswerToClient("OK");
-        } else {
-            updateAnswerToClientWithReason("ERROR", "No such key");
+            System.out.printf("An exception occurred %s", e.getMessage());
         }
     }
 
 
-    /* Before 4th stage method implementation
-
-    private static String getUserString(String[] userCommand) {
-        StringBuilder userString = new StringBuilder();
-        for (int i = 2; i < userCommand.length; i++) {
-            userString.append(userCommand[i]).append(" ");
-        }
-        return userString.toString().trim();
-    }
-    */
-
-    /* Before 4th stage method implementation
-
-    private static void setOperation(String[] userCommand) {
-        int index = getCellIndex(userCommand);
-        if (index != - 1) {
-            if (userCommand.length > 2) {
-                DB_ARRAY[index - 1] = getUserString(userCommand);
-            } else {
-                DB_ARRAY[index - 1] = "";
-            }
-            setServerAnswer("OK");
-            //System.out.println("OK");
-        } else {
-            setServerAnswer("ERROR");
-            //System.out.println("ERROR");
-        }
-
-    }
-    */
-
-    /* Before 4th stage method implementation
-
-    private static int getCellIndex(String[] userCommand) {
-        int result = - 1;
-        if (userCommand.length == 1) {
-            System.out.println("Wrong command format.");
-        } else {
-            result = Integer.parseInt(userCommand[1]);
-            if (result > DB_ARRAY.length || result < 1) {
-                System.out.println("ERROR");
-                result = - 1;
-            }
-        }
-        return result;
-    }
-    */
-
-    /* Before 4th stage method implementation
-
-    private static void getOperation(String[] userCommand) {
-        int index = getCellIndex(userCommand);
-        if (index != - 1) {
-            if ("".equals(DB_ARRAY[index - 1])) {
-                setServerAnswer("ERROR");
-                //System.out.println("ERROR");
-            } else {
-                //System.out.println(DB_ARRAY[index - 1]);
-                setServerAnswer(DB_ARRAY[index - 1]);
-            }
-        }
-    }
-    */
-
-    /* Before 4th stage method implementation
-
-    private static void deleteOperation(String[] userCommand) {
-        int index = getCellIndex(userCommand);
-        if (index != - 1) {
-            if (!"".equals(DB_ARRAY[index - 1])) {
-                DB_ARRAY[index - 1] = "";
-            }
-            //System.out.println("OK");
-            setServerAnswer("OK");
-        } else {
-            setServerAnswer("ERROR");
-        }
-    }
-    */
-
-    /* Before 4th stage method implementation
-
-    private static String[] acceptUserCommand(String msg) {
-        return msg.split(" ");
-    }
-    */
 }
