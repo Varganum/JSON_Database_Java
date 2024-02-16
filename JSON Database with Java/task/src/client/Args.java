@@ -34,7 +34,7 @@ public class Args {
     @Parameter(names = "-v", description = "The value to save in the database: you only need it in case of a 'set' request")
     public String valueToSave;
 
-    @Parameter(names = "-in", description = "The file name consisting a request to server")
+    @Parameter(names = "-in", description = "The file name containing a request to server")
     public String requestFile;
 
 }

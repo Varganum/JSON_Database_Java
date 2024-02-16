@@ -9,22 +9,22 @@ import java.util.Objects;
 public class Request {
 
     private String type;
-    private String cellKey;
+    private Object cellKey;
 
-    private String cellValue;
+    private Object cellValue;
 
-    private Map<String, String> requestData;
+    private Map<String, Object> requestData;
 
     private String requestJson;
 
-    public Request(String type, String cellKey, String cellValue) {
+    public Request(String type, Object cellKey, Object cellValue) {
         this.type = type;
         this.cellKey = cellKey;
         this.cellValue = cellValue;
         buildRequest();
     }
 
-    public Request(String type, String cellKey) {
+    public Request(String type, Object cellKey) {
         this.type = type;
         this.cellKey = cellKey;
         this.cellValue = null;
@@ -50,16 +50,8 @@ public class Request {
         this.requestJson = new Gson().toJson(requestData);
     }
 
-    public void printRequestJson() {
-        System.out.println(this.requestJson);
-    }
-
     public String getRequestJson() {
         return requestJson;
-    }
-
-    public boolean isExit() {
-        return "exit".equals(this.type);
     }
 
 }
